@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <script src="d3.v5.min.js"></script>
+    <script src="d3-geo-projection.v2.min.js"></script>
+    <script src="d3-geo-polygon.v1.min.js"></script>
+    <script src="topojson-client.v2.min.js"></script>
+    <script src="versor.js"></script>
+<style>
+    svg {
+        display: block;
+        margin: 0 auto;
+    }
+
+body {
+  background: #fcfcfa;
+}
+
+.stroke {
+  fill: none;
+  stroke: none;
+  stroke-width: 2px;
+}
+
+.fill {
+  fill: #33aadd;
+}
+
+.graticule {
+  fill: none;
+  stroke: #777;
+  stroke-width: .5px;
+  stroke-opacity: .5;
+}
+
+.land {
+  fill: #fff;
+}
+
+.boundary {
+  fill: none;
+  stroke: #999;
+  stroke-width: .5px;
+}
+
+.stations {
+    fill: black;
+    stroke: none;
+}
+
+</style>
+</head>
+<body>
+    <script>
+
+var width  = 1500,
+    height = 900;
+
+// var projection = d3.geoAirocean()
+var projection = d3.geoCylindricalStereographic()
+    .fitSize([width, height], {type: "Sphere"})
+    .parallel(0);
+
+var path = d3.geoPath().projection(projection).pointRadius(1);
+
+var graticule = d3.geoGraticule();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var defs = svg.append("defs");
+
+defs.append("path")
+    .datum({type: "Sphere"})
+    .attr("id", "sphere")
+    .attr("d", path);
+
+defs.append("clipPath")
+    .attr("id", "clip")
+  .append("use")
+    .attr("xlink:href", "#sphere");
+
+svg.append("use")
+    .attr("class", "stroke")
+    .attr("xlink:href", "#sphere");
+
+svg.append("use")
+    .attr("class", "fill")
+    .attr("xlink:href", "#sphere");
+
+svg.append("path")
+    .datum(graticule)
+    .attr("class", "graticule")
+    .attr("clip-path", "url(#clip)")
+    .attr("d", path);
+
+var stations_points = {
+    "type": "MultiPoint",
+    "coordinates": [],
+};
+
+map_layer = svg.append("g").attr("id", "map")
+stations_layer =  svg.append("g").attr("id", "stations")
+
+d3.tsv("stations.tsv").then(function(stations) {
+    stations.forEach(function(s) {
+        stations_points.coordinates.push([360-parseFloat(s.lon), parseFloat(s.lat)]);
+    })
+
+    stations_layer.selectAll('.stations')
+      .data([stations_points])
+      .enter()
+    .append('path')
+      .classed('stations', true)
+      .attr('d', path)
+
+});
+
+
+d3.json("110m.json").then(function(world) {
+    var land = topojson.feature(world, world.objects.land);
+    var borders = topojson.mesh(world, world.objects.countries);
+
+
+    map_layer.append("path")
+        .datum(land)
+        .attr("class", "land")
+        .attr("d", path);
+
+    map_layer.append("path")
+        .datum(borders, (a, b) => a !== b)
+        .attr("class", "boundary")
+        .attr("stroke-linejoin", "round")
+        .attr("d", path);
+
+});
+
+</script>
+</body>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+   <meta charset="UTF-8">
+<canvas width="960" height="600"></cavnas>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+<script src="https://unpkg.com/topojson-client@2"></script>
+<script src="versor.js"></script>
+<script>
+
+var canvas = d3.select("canvas"),
+    width = canvas.property("width"),
+    height = canvas.property("height"),
+    context = canvas.node().getContext("2d");
+
+// var projection = d3.geoOrthographic()
+// var projection = d3.geoGnomonic()
+// var projection = d3.geoInterruptedHomolosine()
+// var projection = d3.geoCylindricalStereographic().parallel(55.654)
+var projection = d3.geoCylindricalStereographic().parallel(45)
+    .scale((height - 10) / 4)
+    .translate([width / 2, height / 2])
+    .precision(0.1);
+
+var path = d3.geoPath()
+    .projection(projection)
+    .pointRadius(1)
+    .context(context);
+
+
+canvas.call(d3.drag()
+    .on("start", dragstarted)
+    .on("drag", dragged));
+
+var sphere = {type: "Sphere"};
+path(sphere), context.clip();
+
+var render = function() {},
+    v0, // Mouse position in Cartesian coordinates at start of drag gesture.
+    r0, // Projection rotation as Euler angles at start.
+    q0; // Projection rotation as versor at start.
+
+function dragstarted() {
+  v0 = versor.cartesian(projection.invert(d3.mouse(this)));
+  r0 = projection.rotate();
+  q0 = versor(r0);
+}
+
+function dragged() { var v1 = versor.cartesian(projection.rotate(r0).invert(d3.mouse(this))),
+      q1 = versor.multiply(q0, versor.delta(v0, v1)),
+      r1 = versor.rotation(q1);
+  projection.rotate(r1);
+  render();
+}
+
+var stations = {
+    "type": "MultiPoint",
+    "coordinates": [],
+};
+
+d3.tsv("stations.tsv", function(error, data) {
+  if (error) throw error;
+    data.forEach(function(s) {
+        stations.coordinates.push([360-parseFloat(s.lon), parseFloat(s.lat)]);
+    });
+});
+
+console.log(stations);
+
+var myline = {
+        "type": "LineString",
+        "coordinates": [
+            [ 147.32,   -42.88  ],
+            [ -77.03,   38.90  ]
+        ]
+    };
+
+d3.json("https://unpkg.com/world-atlas@1/world/110m.json", function(error, world) {
+  if (error) throw error;
+
+  var land = topojson.feature(world, world.objects.land);
+  var countries = topojson.mesh(world, world.objects.countries);
+
+  render = function() {
+    context.clearRect(0, 0, width, height);
+    // context.beginPath(), path(land),   context.fillStyle = "#000",   context.fill();
+    context.beginPath(), path(countries), context.strokeStyle = "#999", context.lineWidth = 0.5, context.stroke();
+    context.beginPath(), path(myline),    context.strokeStyle = "#f00", context.lineWidth = 1.5, context.stroke();
+    context.beginPath(), path(stations),  context.fillStyle = "#000", context.fill();
+    context.beginPath(), path(sphere),    context.strokeStyle = "#777", context.lineWidth = 1, context.stroke();
+  };
+
+  render();
+});
+
+</script>
